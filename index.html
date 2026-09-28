@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0a10">
+<title>Lofi Russia · Москва</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;height:100%;background:#07060a;overflow:hidden}
+  #stage{position:fixed;inset:0;overflow:hidden}
+  canvas{position:absolute;display:block;image-rendering:pixelated;image-rendering:crisp-edges}
+  #hud{position:fixed;left:24px;top:20px;color:#eadfca;font-family:'Press Start 2P',monospace;
+       pointer-events:none;text-shadow:0 2px 0 rgba(0,0,0,.7);transition:opacity .4s}
+  #hud .k{font-size:9px;letter-spacing:3px;opacity:.5}
+  #hud h1{font-size:22px;margin:12px 0;font-weight:400}
+  #hud .s{font-size:9px;opacity:.6;line-height:1.6}
+  #hud.off,#player.off{opacity:0;pointer-events:none}
+
+  /* ---------- player ---------- */
+  #player{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom));transform:translateX(-50%);display:flex;align-items:center;gap:6px;
+          padding:8px 14px 8px 8px;border-radius:18px;background:rgba(10,12,28,.84);border:1px solid rgba(255,255,255,.07);
+          box-shadow:0 10px 40px rgba(0,0,0,.45);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+          color:#e9e4f2;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;transition:opacity .4s;user-select:none;
+          max-width:calc(100vw - 32px);box-sizing:border-box}
+  #player button{all:unset;cursor:pointer;display:grid;place-items:center;width:44px;height:44px;border-radius:12px;color:#d6d2e4}
+  #player button:hover{background:rgba(255,255,255,.07);color:#fff}
+  #player button:focus-visible{outline:2px solid #e8a868;outline-offset:2px}
+  #player svg{width:18px;height:18px;shape-rendering:crispEdges;fill:currentColor}
+  #player svg[hidden]{display:none}
+  #play{width:52px!important;height:52px!important;background:#e8a868!important;color:#1a1322!important;border-radius:14px!important;
+        box-shadow:0 0 0 5px rgba(232,168,104,.12)}
+  #play:hover{background:#f2b77a!important}
+  #play svg{width:20px;height:20px}
+  .meta{min-width:0;width:230px;padding:0 10px}
+  .meta .title{font-family:'Press Start 2P',monospace;font-size:11px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta .sub{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;color:#8f8aa6;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .meta .bar{height:2px;background:rgba(255,255,255,.08);margin-top:6px;border-radius:2px;overflow:hidden}
+  .meta .bar i{display:block;height:100%;width:0;background:#e8a868}
+  .vol{display:flex;align-items:center;gap:8px;color:#8f8aa6;padding:0 6px}
+  .vol svg{width:16px;height:16px}
+  .vol input{-webkit-appearance:none;appearance:none;width:110px;height:8px;border-radius:8px;cursor:pointer;
+             background:linear-gradient(90deg,#e8a868 var(--v,50%),#34324a var(--v,50%))}
+  .vol input::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#e8a868;border:3px solid #1a1628}
+  .vol input::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:#e8a868;border:3px solid #1a1628}
+  .sep{width:1px;height:28px;background:rgba(255,255,255,.08);margin:0 4px}
+  @media (max-width:760px){ .vol,.sep,#fs{display:none!important} .meta{width:auto;flex:1} }
+  /* phones in landscape: compact player and title so the scene stays visible */
+  @media (max-height:520px){
+    .vol,.sep{display:none!important}
+    #player{bottom:calc(10px + env(safe-area-inset-bottom));padding:5px 8px 5px 5px;border-radius:14px}
+    #player button{width:36px;height:36px}
+    #play{width:40px!important;height:40px!important;border-radius:11px!important}
+    .meta{width:180px}
+    .meta .title{font-size:9px}
+    .meta .sub{font-size:11px}
+    #hud{left:16px;top:12px}
+    #hud h1{font-size:15px;margin:8px 0}
+  }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c"></canvas></div>
+<div id="hud">
+  <div class="k">LOFI RUSSIA</div>
+  <h1>Москва</h1>
+  <div class="s"><span id="t">--:--</span></div>
+</div>
+<div id="player">
+  <button id="play" aria-label="Play">
+    <svg viewBox="0 0 9 9" id="ico-play"><rect x="3" y="1" width="1" height="7"/><rect x="4" y="2" width="1" height="5"/><rect x="5" y="3" width="1" height="3"/><rect x="6" y="4" width="1" height="1"/></svg>
+    <svg viewBox="0 0 9 9" id="ico-pause" hidden><rect x="2" y="1" width="2" height="7"/><rect x="5" y="1" width="2" height="7"/></svg>
+  </button>
+  <button id="next" aria-label="Следующий трек" title="Следующий трек (N)">
+    <svg viewBox="0 0 9 9"><rect x="1" y="1" width="1" height="7"/><rect x="2" y="2" width="1" height="5"/><rect x="3" y="3" width="1" height="3"/><rect x="4" y="4" width="1" height="1"/><rect x="6" y="1" width="2" height="7"/></svg>
+  </button>
+  <div class="meta">
+    <div class="title" id="p-title">Нажми play</div>
+    <div class="sub" id="p-sub">lofi для зимней Москвы</div>
+    <div class="bar"><i id="p-bar"></i></div>
+  </div>
+  <div class="sep"></div>
+  <label class="vol" title="Музыка">
+    <svg viewBox="0 0 9 9"><rect x="5" y="1" width="1" height="6"/><rect x="6" y="1" width="2" height="1"/><rect x="7" y="2" width="1" height="1"/><rect x="2" y="6" width="3" height="2"/><rect x="3" y="5" width="2" height="1"/></svg>
+    <input type="range" id="v-music" min="0" max="100" value="80" aria-label="Громкость музыки">
+  </label>
+  <label class="vol" title="Снег и винил">
+    <svg viewBox="0 0 9 9"><rect x="4" y="1" width="1" height="7"/><rect x="1" y="4" width="7" height="1"/><rect x="2" y="2" width="1" height="1"/><rect x="6" y="2" width="1" height="1"/><rect x="2" y="6" width="1" height="1"/><rect x="6" y="6" width="1" height="1"/></svg>
+    <input type="range" id="v-amb" min="0" max="100" value="45" aria-label="Громкость атмосферы">
+  </label>
+  <div class="sep"></div>
+  <button id="fs" aria-label="Полный экран" title="Полный экран (F)">
+    <svg viewBox="0 0 9 9"><rect x="1" y="1" width="3" height="1"/><rect x="1" y="1" width="1" height="3"/><rect x="5" y="1" width="3" height="1"/><rect x="7" y="1" width="1" height="3"/><rect x="1" y="7" width="3" height="1"/><rect x="1" y="5" width="1" height="3"/><rect x="5" y="7" width="3" height="1"/><rect x="7" y="5" width="1" height="3"/></svg>
+  </button>
+</div>
+<script>
+// ---------- basics ----------
+// Scene is 480 wide; the original 400px composition sits at offset OX.
+// Screens wider than 16:10 crop the floor, narrower ones crop the sides.
+const W = 480, H = 300, OX = 40;
+const cv = document.getElementById('c');
+cv.width = W; cv.height = H;
+const ctx = cv.getContext('2d');
+
+function mk(w = W, h = H) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function rng(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+const bay = (x, y) => BAYER[(y & 3) * 4 + (x & 3)];
+function hex(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function R(c, x, y, w, h, col) { c.fillStyle = col; c.fillRect(x, y, w, h); }
+function P(c, x, y, col) { c.fillStyle = col; c.fillRect(x, y, 1, 1); }
+function ellipse(c, cx, cy, rx, ry, col, maxY = 1e9) {
+  c.fillStyle = col;
+  for (let y = -ry; y <= ry; y++) {
+    if (cy + y > maxY) continue;
+    const w = Math.round(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))));
+    c.fillRect(Math.round(cx - w), Math.round(cy + y), w * 2 + 1, 1);
+  }
+}
+function line(c, x0, y0, x1, y1, col) {
+  x0 |= 0; y0 |= 0; x1 |= 0; y1 |= 0;
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
+  let e = dx + dy;
+  for (;;) {
+    P(c, x0, y0, col);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * e;
+    if (e2 >= dy) { e += dy; x0 += sx; }
+    if (e2 <= dx) { e += dx; y0 += sy; }
+  }
+}
+function ditherV(c, x0, y0, w, h, cols) {
+  // putImageData ignores transforms, so apply the translation by hand
+  const tf = c.getTransform(); x0 += tf.e; y0 += tf.f;
+  const pal = cols.map(hex), n = pal.length - 1;
+  const img = c.getImageData(x0, y0, w, h), d = img.data;
+  for (let y = 0; y < h; y++) {
+    const t = y / (h - 1) * n;
+    for (let x = 0; x < w; x++) {
+      let i = Math.floor(t); if (t - i > bay(x0 + x, y0 + y)) i++;
+      const p = pal[Math.min(i, n)], k = (y * w + x) * 4;
+      d[k] = p[0]; d[k + 1] = p[1]; d[k + 2] = p[2]; d[k + 3] = 255;
+    }
+  }
+  c.putImageData(img, x0, y0);
+}
+function glow(c, x, y, r, rgb, a) {
+  const g = c.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, `rgba(${rgb},${a})`);
+  g.addColorStop(1, `rgba(${rgb},0)`);
+  c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+}
+
+// window glass rect (screen coords)
+const GX = 117, GY = 43, GW = 166, GH = 134;
+const PANES = [[117, 43, 81, 33], [202, 43, 81, 33], [117, 80, 81, 97], [202, 80, 81, 97]];
+
+// ---------- tiny pixel font ----------
+const GLYPH = {
+  'К': ['1.1', '11.', '1..', '11.', '1.1'],
+  'А': ['.1.', '1.1', '111', '1.1', '1.1'],
+  'Ф': ['.1.', '111', '1.1', '111', '.1.'],
+  'Е': ['111', '1..', '11.', '1..', '111'],
+};
+function text(c, s, x, y, col) {
+  for (const ch of s) {
+    const g = GLYPH[ch];
+    g.forEach((row, j) => [...row].forEach((v, i) => { if (v === '1') P(c, x + i, y + j, col); }));
+    x += 4;
+  }
+}
+
+// =====================================================================
+// CITY (local coords inside glass, GW x GH)
+// =====================================================================
+const cityC = mk(GW, GH);
+const cityWin = [];            // facade windows that can switch on/off
+const stars = [];
+const blinkers = [];           // aviation lights
+const chimneys = [[8, 88], [38, 88], [161, 92]];
+
+function onion(c, cx, top, ws, A, B, mode) {
+  ws.forEach((w, i) => {
+    const y = top + i;
+    for (let k = 0; k < w; k++) {
+      const x = cx - (w >> 1) + k;
+      let s;
+      if (mode === 'spiral') s = ((x - cx + i + 40) >> 1) & 1;
+      else if (mode === 'check') s = (x + (i >> 1)) & 1;
+      else s = ((x - cx + 40) >> 1) & 1;
+      P(c, x, y, s ? A : B);
+    }
+    // soft highlight on left edge
+    P(c, cx - (w >> 1), y, 'rgba(255,255,255,0.18)');
+  });
+  const gold = '#f0c850';
+  P(c, cx, top - 1, gold); P(c, cx, top - 2, gold); P(c, cx, top - 3, gold); P(c, cx, top - 4, gold);
+  P(c, cx - 1, top - 3, gold); P(c, cx + 1, top - 3, gold);
+}
+function drum(c, cx, y0, y1, w) {
+  // red brick drum with white stone trims and arched windows
+  R(c, cx - (w >> 1), y0, w, y1 - y0, '#b0422e');
+  R(c, cx - (w >> 1), y0, 1, y1 - y0, '#c85a42');
+  R(c, cx + (w >> 1), y0, 1, y1 - y0, '#7a2a1e');
+  R(c, cx - (w >> 1), y0, w, 1, '#e8dcc4');
+  for (let y = y0 + 3; y < y1 - 2; y += 6) { R(c, cx - 1, y - 1, 3, 1, '#e8dcc4'); P(c, cx, y, '#3a1410'); P(c, cx, y + 1, '#3a1410'); }
+}
+
+function drawCity() {
+  const c = cityC.getContext('2d');
+  const r = rng(42);
+  // sky
+  ditherV(c, 0, 0, GW, 114, ['#05081c', '#080d27', '#0d1334', '#131a42', '#1d1e4c', '#2b2352', '#3f2a56', '#5a3454', '#74404f']);
+
+  // stars
+  for (let i = 0; i < 55; i++) {
+    const x = Math.floor(r() * GW), y = Math.floor(r() * 62);
+    const bright = r() < 0.25;
+    P(c, x, y, bright ? '#dfe4ff' : '#6d78b0');
+    if (r() < 0.35) stars.push({ x, y, p: r() * 6.28, s: 1 + r() * 2 });
+  }
+
+  // moon + halo
+  const mx = 150, my = 16;
+  for (let y = my - 18; y <= my + 18; y++) for (let x = mx - 18; x <= mx + 18; x++) {
+    const d = Math.hypot(x - mx, y - my);
+    if (d > 7.5 && d < 18) {
+      const p = (1 - (d - 7.5) / 10.5);
+      if (p * 0.8 > bay(x, y)) P(c, x, y, d < 11 ? '#3a4380' : '#232a62');
+    }
+  }
+  ellipse(c, mx, my, 7, 7, '#efe8c8');
+  ellipse(c, mx + 1, my, 6, 6, '#f7f2da');
+  [[147, 13], [148, 13], [152, 18], [153, 18], [152, 19], [146, 19], [155, 13]].forEach(([x, y]) => P(c, x, y, '#d6cfae'));
+
+  // ---- far: Ostankino ----
+  const oc = '#1a1b40', ohl = '#2b2d5e';
+  R(c, 18, 14, 1, 16, oc);
+  R(c, 17, 30, 3, 14, oc); R(c, 17, 30, 1, 14, ohl);
+  R(c, 14, 44, 9, 4, oc); R(c, 14, 44, 9, 1, ohl);
+  for (let x = 15; x < 22; x += 2) P(c, x, 46, '#e8b870');
+  R(c, 17, 48, 3, 34, oc); R(c, 17, 48, 1, 34, ohl);
+  for (let y = 82; y < 100; y++) { const w = 3 + Math.floor((y - 82) / 3) * 2; R(c, 18 - (w >> 1), y, w, 1, oc); }
+  blinkers.push({ x: 18, y: 13, p: 0 }, { x: 18, y: 36, p: 0.5 }, { x: 18, y: 62, p: 1.0 });
+
+  // ---- far: Stalin high-rise (MSU-like) ----
+  const sb = '#1c1a3d', sl = '#2e2954';
+  const tiers = [[36, 84, 49, 20], [40, 73, 8, 11], [73, 73, 8, 11], [49, 62, 23, 22], [52, 50, 17, 12], [55, 41, 11, 9], [57, 35, 7, 6], [59, 30, 3, 5]];
+  tiers.forEach(([x, y, w, h]) => {
+    R(c, x, y, w, h, sb); R(c, x, y, 1, h, sl); R(c, x, y, w, 1, sl);
+    for (let yy = y + 2; yy < y + h - 1; yy += 3) for (let xx = x + 2; xx < x + w - 1; xx += 2)
+      if (r() < 0.22) P(c, xx, yy, r() < 0.5 ? '#c89050' : '#e8b868');
+  });
+  R(c, 43, 66, 1, 7, sb); R(c, 76, 66, 1, 7, sb);
+  R(c, 60, 16, 1, 14, sb);
+  P(c, 60, 13, '#f0c050'); R(c, 59, 14, 3, 1, '#f0c050'); P(c, 60, 15, '#c89a38');
+
+  // ---- far: Moscow City ----
+  const towers = [
+    { x: 121, w: 8, top: 40, c: '#16224a', win: '#7aa0e0' },
+    { x: 129, w: 9, top: 26, c: '#1a2850', win: '#8ab4f4', spire: 1 },
+    { x: 138, w: 8, top: 34, c: '#2a2034', win: '#e8b068', pyr: 1 },
+    { x: 146, w: 9, top: 44, c: '#182448', win: '#98bcf4', round: 1 },
+    { x: 155, w: 8, top: 56, c: '#15203e', win: '#7090d0' },
+  ];
+  towers.forEach(t => {
+    R(c, t.x, t.top, t.w, 110 - t.top, t.c);
+    if (t.spire) { for (let i = 1; i <= 4; i++) { const w = t.w - (5 - i) * 2; if (w > 0) R(c, t.x + ((t.w - w) >> 1), t.top - 5 + i, w, 1, t.c); } R(c, t.x + (t.w >> 1), t.top - 9, 1, 5, t.c); }
+    if (t.pyr) { R(c, t.x + 1, t.top - 2, t.w - 2, 2, t.c); R(c, t.x + 2, t.top - 4, t.w - 4, 2, t.c); R(c, t.x + 3, t.top - 6, t.w - 6, 2, '#6a4a30'); }
+    if (t.round) { R(c, t.x + 1, t.top - 1, t.w - 2, 1, t.c); R(c, t.x + 2, t.top - 2, t.w - 4, 1, t.c); }
+    for (let y = t.top + 1; y < 108; y += 2) for (let x = t.x + 1; x < t.x + t.w - 1; x += 2)
+      P(c, x, y, r() < 0.33 ? t.win : 'rgba(80,100,160,0.35)');
+    R(c, t.x + t.w - 1, t.top, 1, 110 - t.top, 'rgba(140,170,230,0.18)');
+    blinkers.push({ x: t.x + (t.w >> 1), y: t.top - (t.spire ? 10 : t.pyr ? 7 : 3), p: r() * 2 });
+  });
+
+  // ---- mid: Kremlin wall ----
+  ditherV(c, 0, 94, GW, 20, ['#5e2020', '#6e2824', '#80322a', '#94402e']);
+  for (let x = 0; x < GW; x++) {
+    const m = x % 5;
+    if (m < 3) { R(c, x, m === 1 ? 91 : 90, 1, m === 1 ? 3 : 4, '#6a2622'); }
+  }
+  R(c, 0, 94, GW, 1, '#4a1a1a');
+
+  // ---- mid: Spasskaya tower ----
+  const br = '#8a3428', brl = '#a84a38', brd = '#5e1f1c', wt = '#dcd0b8';
+  R(c, 87, 68, 19, 46, br); R(c, 87, 68, 2, 46, brl); R(c, 103, 68, 3, 46, brd);
+  R(c, 87, 68, 19, 1, wt); R(c, 87, 88, 19, 1, wt);
+  R(c, 93, 102, 7, 12, '#2a1010'); R(c, 94, 101, 5, 1, '#2a1010');
+  R(c, 93, 102, 7, 1, '#e0a860');                // lit gate
+  ellipse(c, 96, 78, 4, 4, '#d8a840'); ellipse(c, 96, 78, 3, 3, '#1a1c30');
+  P(c, 96, 76, '#d8a840'); P(c, 96, 77, '#d8a840'); P(c, 97, 78, '#d8a840');
+  R(c, 89, 56, 15, 12, br); R(c, 89, 56, 2, 12, brl); R(c, 102, 56, 2, 12, brd);
+  R(c, 89, 56, 15, 1, wt); R(c, 89, 67, 15, 1, wt);
+  [89, 92, 100, 103].forEach(x => R(c, x, 52, 1, 4, wt));
+  [92, 96, 100].forEach(x => R(c, x, 59, 1, 5, '#3a1410'));
+  R(c, 91, 46, 11, 10, br); R(c, 91, 46, 1, 10, brl); R(c, 91, 46, 11, 1, wt);
+  [93, 96, 99].forEach(x => R(c, x, 48, 2, 5, '#f0b860'));
+  R(c, 92, 40, 9, 6, br); R(c, 92, 40, 9, 1, wt);
+  for (let y = 26; y < 40; y++) {
+    const w = 1 + Math.round((y - 26) / 13 * 8);
+    R(c, 96 - (w >> 1), y, w, 1, '#255a3c');
+    R(c, 96 - (w >> 1), y, Math.max(1, w >> 1), 1, '#3a7c52');
+  }
+
+  // ---- mid: St. Basil's ----
+  for (let y = 58; y < 80; y++) {
+    const w = 1 + Math.round((y - 58) / 21 * 8);
+    for (let k = 0; k < w; k++) { const x = 130 - (w >> 1) + k; P(c, x, y, (x + y) % 4 === 0 || (x - y + 80) % 4 === 0 ? '#ecdcb8' : '#c04632'); }
+  }
+  P(c, 130, 55, '#f0c850'); R(c, 129, 56, 3, 2, '#f0c850'); P(c, 130, 53, '#f0c850'); P(c, 130, 54, '#f0c850');
+  R(c, 125, 80, 11, 16, '#b0422e'); R(c, 125, 80, 1, 16, '#c85a42'); R(c, 135, 80, 1, 16, '#7a2a1e'); R(c, 125, 80, 11, 1, '#e8dcc4');
+  [127, 130, 133].forEach(x => R(c, x, 84, 1, 3, '#4a2a20'));
+  const big = [1, 1, 3, 5, 7, 9, 11, 11, 11, 9, 7, 5], small = [1, 1, 3, 5, 7, 9, 9, 9, 7, 5];
+  drum(c, 122, 74, 96, 7); drum(c, 138, 76, 96, 7);
+  drum(c, 116, 82, 96, 5); drum(c, 144, 82, 96, 5);
+  onion(c, 122, 62, big, '#f0c040', '#3a8a4a', 'check');
+  onion(c, 138, 64, big, '#e0702a', '#2e7a6a', 'stripe');
+  onion(c, 116, 72, small, '#d83a2a', '#3a8a4a', 'spiral');
+  onion(c, 144, 72, small, '#4a6ad0', '#e8e8e0', 'spiral');
+  R(c, 110, 96, 42, 18, '#a8402e'); R(c, 110, 96, 42, 1, wt); R(c, 110, 97, 2, 17, '#a85040');
+  for (let x = 113; x < 150; x += 4) { R(c, x, 101, 2, 3, '#e8b068'); P(c, x, 100, '#6a2a20'); }
+  R(c, 110, 106, 42, 1, wt);
+
+  // ---- near: rooftops ----
+  const fac = '#221c2c', roof = '#17131f', snow = '#b6c2dc', snowHi = '#e0e8f6', dark = '#15111c';
+  function windows(x0, x1, y0, y1) {
+    for (let y = y0; y < y1 - 3; y += 7) for (let x = x0; x < x1 - 2; x += 6) {
+      R(c, x, y, 3, 4, dark);
+      cityWin.push({ x, y, lit: r() < 0.45, col: r() < 0.12 ? 'tv' : ['#f0c070', '#e8a050', '#ffd890', '#f4b060'][Math.floor(r() * 4)] });
+    }
+  }
+  // A: mansard building with metro sign
+  for (let y = 96; y < 104; y++) { const inset = Math.round((104 - y) / 2); R(c, inset, y, 46 - inset * 2, 1, roof); }
+  R(c, 4, 95, 38, 2, snow); R(c, 5, 95, 36, 1, snowHi);
+  R(c, 0, 103, 46, 1, snow);
+  R(c, 0, 104, 46, 30, fac);
+  [[12, 97], [30, 97]].forEach(([x, y]) => { R(c, x - 1, y - 2, 6, 7, roof); P(c, x + 1, y - 3, roof); R(c, x - 1, y - 3, 6, 1, snow); R(c, x, y, 4, 4, '#e8b060'); R(c, x + 2, y, 1, 4, roof); });
+  R(c, 6, 88, 4, 8, '#2a2030'); R(c, 5, 87, 6, 1, snowHi);
+  R(c, 36, 88, 4, 8, '#2a2030'); R(c, 35, 87, 6, 1, snowHi);
+  R(c, 23, 84, 1, 12, '#3a3448');
+  windows(3, 45, 107, 130);
+  // B: flat roof with antenna + cafe sign
+  R(c, 46, 110, 46, 24, '#261e2e'); R(c, 46, 108, 46, 2, snow); R(c, 46, 108, 46, 1, snowHi);
+  R(c, 80, 98, 1, 10, '#3a3448'); R(c, 76, 100, 9, 1, '#3a3448'); R(c, 77, 103, 7, 1, '#3a3448');
+  R(c, 55, 114, 19, 9, '#110c16');
+  windows(49, 55, 114, 132); windows(76, 91, 114, 132); windows(55, 76, 125, 132);
+  // C: low building in front of the Kremlin
+  R(c, 92, 114, 58, 20, '#1f1a28'); R(c, 92, 112, 58, 2, snow); R(c, 92, 112, 58, 1, snowHi);
+  windows(95, 150, 117, 132);
+  // D: right gable
+  for (let x = 150; x < GW; x++) { const top = x < 155 ? 104 - (x - 150) : 99; R(c, x, top, 1, 106 - top, roof); P(c, x, top - 1, snow); P(c, x, top, snowHi); }
+  R(c, 159, 92, 4, 8, '#2a2030'); R(c, 158, 91, 6, 1, snowHi);
+  R(c, 150, 106, 16, 28, '#241d2d');
+  windows(152, GW, 109, 132);
+
+  // snow drift on the outer sill (bottom of glass)
+  for (let x = 0; x < GW; x++) {
+    const h = 4 + Math.round(Math.sin(x * 0.31) * 1.2 + Math.sin(x * 0.11 + 1) * 1.3);
+    R(c, x, GH - h, 1, h, '#c4cee4'); P(c, x, GH - h, '#eef2fb');
+  }
+}
+
+// =====================================================================
+// GLASS overlay (frost + reflections), screen coords
+// =====================================================================
+const glassC = mk();
+function drawGlass() {
+  const c = glassC.getContext('2d');
+  c.translate(OX, 0);
+  R(c, GX, GY, GW, GH, 'rgba(120,150,210,0.05)');
+  PANES.forEach(([x0, y0, w, h]) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+      const bl = Math.hypot(x - x0, y - (y0 + h)), brr = Math.hypot(x - (x0 + w), y - (y0 + h));
+      const tl = Math.hypot(x - x0, y - y0), tr = Math.hypot(x - (x0 + w), y - y0);
+      let p = Math.max(0, 1 - Math.min(bl, brr) / 16) ** 1.6 + Math.max(0, 1 - Math.min(tl, tr) / 9) ** 2 * 0.7;
+      p += Math.max(0, 1 - (y0 + h - y) / 5) * 0.35;
+      if (p > bay(x, y) + 0.05) P(c, x, y, p > 0.75 ? 'rgba(225,235,250,0.55)' : 'rgba(190,210,240,0.28)');
+    }
+  });
+  // diagonal reflection streaks
+  for (let i = 0; i < 90; i++) {
+    const x = 214 + i * 0.6, y = 90 + i;
+    if (y < 176) { P(c, Math.round(x), y, 'rgba(255,255,255,0.05)'); P(c, Math.round(x) + 3, y, 'rgba(255,255,255,0.035)'); }
+  }
+  for (let i = 0; i < 40; i++) P(c, 130 + Math.round(i * 0.6), 84 + i, 'rgba(255,255,255,0.04)');
+}
+
+// =====================================================================
+// ROOM (static)
+// =====================================================================
+const roomC = mk();
+const garland = [];
+
+function carpet(c, x0, y0, w, h) {
+  const cx = x0 + (w - 1) / 2, cy = y0 + (h - 1) / 2;
+  const band = ['#e0b870', '#2e3458', '#b8403a', '#ecdcb4', '#2e3458', '#c8963e', '#8a2a2e'];
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+    const lx = x - x0, ly = y - y0, ex = Math.min(lx, w - 1 - lx), ey = Math.min(ly, h - 1 - ly), e = Math.min(ex, ey);
+    let col;
+    if (e === 0) col = '#2a1418';
+    else if (e === 1 || e === 7) col = '#c8963e';
+    else if (e < 7) {
+      const along = ex < ey ? ly : lx;
+      const zig = Math.abs((along % 8) - 4);
+      col = Math.round(zig * 4 / 4) + 2 === e || Math.round(zig * 4 / 4) + 2 === e + 1 && zig === 4 ? '#b8403a' : '#262a4c';
+    } else {
+      const du = Math.abs(x - cx) / (w / 2 - 8), dv = Math.abs(y - cy) / (h / 2 - 8);
+      const m = du + dv, m2 = (1 - du) + (1 - dv);
+      if (m < 0.66) col = band[Math.floor(m * 13) % band.length];
+      else if (m2 < 0.36) col = band[(Math.floor(m2 * 13) + 2) % band.length];
+      else {
+        col = '#8a262c';
+        const a = (lx - 8) % 9, b = (ly - 8) % 9;
+        if ((a === 4 && b >= 3 && b <= 5) || (b === 4 && a >= 3 && a <= 5)) col = '#d8a850';
+        else if ((a + b) % 9 === 0 && a % 3 === 0) col = '#5a1a22';
+      }
+    }
+    P(c, x, y, col);
+  }
+  for (let x = x0 + 1; x < x0 + w - 1; x += 2) { P(c, x, y0 + h, '#d8c8a0'); P(c, x, y0 + h + 1, '#b8a880'); }
+}
+
+function matryoshka(c, cx, bottom, h) {
+  const rb = Math.round(h * 0.34), rh = Math.max(2, Math.round(h * 0.25));
+  ellipse(c, cx, bottom - rb, rb, rb, '#c8342a', bottom - 1);
+  ellipse(c, cx, bottom - rb * 2 - rh + 2, rh, rh, '#c8342a');
+  ellipse(c, cx, bottom - rb * 2 - rh + 2, Math.max(1, rh - 1), Math.max(1, rh - 1), '#f2d2b0');
+  P(c, cx, bottom - rb * 2 - rh + 1 - (rh > 2 ? 1 : 0) + 1, '#f2d2b0');
+  R(c, cx - 1, bottom - rb - 1, 3, 2, '#f0c850');
+  P(c, cx, bottom - rb - 1, '#3a8a4a');
+  P(c, cx - rb, bottom - rb, 'rgba(255,255,255,0.25)');
+}
+
+// Guitar drawn in its own (u along the neck, v across) space, rotated by `ang`.
+function guitarPixel(u, v) {
+  const av = Math.abs(v);
+  if (u >= 64 && u < 73 && av < 2.6) {
+    if (u < 65) return '#e8e0c8';                                   // nut
+    if (av > 1.6) return (u - 65.5) % 2.6 < 1.2 ? '#f0d890' : null; // tuning pegs
+    return '#3a2418';
+  }
+  const onString = u > 8.5 && Math.abs(av - 1) < 0.45;               // two strings, bridge to nut
+  if (u > 33 && u < 64 && av < 2) {
+    if ((u - 35) % 5 < 0.7) return '#b8a888';                        // frets
+    if (onString) return '#c8b898';
+    return v < 0 ? '#4a2c18' : '#2a1a10';
+  }
+  // smooth union of the two bouts, so the waist is a gentle curve, not a pinch
+  const a = Math.hypot(u - 11, v) - 11, b = Math.hypot(u - 28.5, v) - 8.2, k = 9;
+  const hk = Math.max(k - Math.abs(a - b), 0) / k;
+  const body = Math.min(a, b) - hk * hk * k / 4;
+  if (body >= 0) return null;
+  if (body > -1.1) return '#5a2e14';
+  if (onString) return '#efe4c8';
+  const hole = Math.hypot(u - 24, v);
+  if (hole < 3.1) return '#1a0f08';
+  if (hole < 4.1) return '#e0b070';
+  if (u > 7 && u < 9.2 && av < 4.5) return '#3a2418';                // bridge
+  return v < -5 ? '#d8904a' : v > 6 ? '#a8602c' : '#c07838';
+}
+function guitar(c, bx, by, ang) {
+  const s = Math.sin(ang), co = Math.cos(ang);
+  for (let y = by - 80; y <= by; y++) for (let x = bx - 16; x <= bx + 24; x++) {
+    const dx = x + 0.5 - bx, dy = by - (y + 0.5);
+    const col = guitarPixel(dx * s + dy * co, dx * co - dy * s);
+    if (col) P(c, x, y, col);
+  }
+}
+
+function drawRoom() {
+  const c = roomC.getContext('2d');
+  const r = rng(7);
+
+  // ceiling + cornice
+  ditherV(c, 0, 0, W, 14, ['#6e675e', '#7c756a', '#8a8276']);
+  R(c, 0, 14, W, 1, '#b8b0a0'); R(c, 0, 15, W, 2, '#a0987f'); R(c, 0, 17, W, 1, '#5e5646');
+
+  // wallpaper
+  R(c, 0, 18, W, 228, '#7c5848');
+  for (let x = 0; x < W; x += 8) R(c, x, 18, 1, 228, '#714f40');
+  for (let y = 26, row = 0; y < 246; y += 14, row++) for (let x = 4; x < W; x += 16) {
+    const X = x + (row % 2 ? 8 : 0);
+    P(c, X, y - 1, '#8e6654'); R(c, X - 1, y, 3, 1, '#8e6654'); P(c, X, y + 1, '#8e6654');
+  }
+
+  // floor: herringbone parquet
+  const fl = ['#8a5a38', '#7c4f30', '#946440', '#83553a', '#8f5d3c'];
+  for (let y = 250; y < H; y++) for (let x = 0; x < W; x++) {
+    const col = Math.floor(x / 8), lx = x % 8;
+    const s = col % 2 ? (y - lx + 8) : (y + lx);
+    const id = Math.floor(s / 4);
+    let cc = fl[(id * 7 + col * 13) % fl.length];
+    if (s % 4 === 0) cc = '#5e3a22';
+    if (lx === 0) cc = '#6a4228';
+    P(c, x, y, cc);
+  }
+  R(c, 0, 244, W, 6, '#6a4a32'); R(c, 0, 244, W, 1, '#8e6848'); R(c, 0, 250, W, 1, '#3a2418');
+
+  // rug
+  const rcx = W / 2, rcy = 286, rrx = 170, rry = 22;
+  for (let y = rcy - rry; y < H; y++) for (let x = rcx - rrx; x <= rcx + rrx; x++) {
+    const e = Math.hypot((x - rcx) / rrx, (y - rcy) / rry);
+    if (e > 1) continue;
+    let col;
+    if (e > 0.93) col = '#5a1e22';
+    else if (e > 0.85) col = ((x + y) % 4 === 0) ? '#e0b870' : '#b88a40';
+    else if (e > 0.72) col = '#2a3050';
+    else if (e > 0.66) col = '#c8963e';
+    else { col = '#8a2a2c'; if ((x % 6 === 0 && y % 3 === 0) || e < 0.2) col = e < 0.2 ? '#c8963e' : '#b8403a'; }
+    P(c, x, y, col);
+  }
+
+  // everything below is laid out in the 400px composition space
+  c.translate(OX, 0);
+
+  // wall carpet
+  carpet(c, 10, 34, 74, 112);
+  R(c, 11, 148, 74, 1, '#5e3e32');
+
+  // window recess
+  R(c, 102, 28, 196, 158, '#8a7a6a');
+  R(c, 102, 28, 8, 156, '#9c8c7a');
+  R(c, 290, 28, 8, 156, '#6e6052');
+  R(c, 102, 28, 196, 8, '#7a6c5c');
+  // frame
+  R(c, 110, 36, 180, 148, '#d8ccb4');
+  R(c, 110, 36, 180, 1, '#ece2cc'); R(c, 110, 36, 1, 148, '#ece2cc');
+  R(c, 116, 42, 168, 136, '#a89c84');
+  c.clearRect(GX, GY, GW, GH);
+  // mullion + transom
+  R(c, 198, 43, 4, 134, '#d8ccb4'); R(c, 198, 43, 1, 134, '#ece2cc'); R(c, 201, 43, 1, 134, '#b0a48c');
+  R(c, 117, 76, 166, 4, '#d8ccb4'); R(c, 117, 76, 166, 1, '#ece2cc'); R(c, 117, 79, 166, 1, '#b0a48c');
+  // bar between the left top sash and the fortochka (small vent sash)
+  R(c, 156, 43, 2, 33, '#d8ccb4'); R(c, 156, 43, 1, 33, '#ece2cc');
+  // every sash gets the same 3px profile on all four sides:
+  // outer bevel (lit top/left), flat body, inner putty edge (shaded top/left)
+  const sashes = [[117, 43, 39, 33], [158, 43, 40, 33], [202, 43, 81, 33], [117, 80, 81, 97], [202, 80, 81, 97]];
+  sashes.forEach(([x, y, w, h]) => {
+    R(c, x, y, w, h, '#efe5d0'); R(c, x + 1, y + h - 1, w - 1, 1, '#a89a80'); R(c, x + w - 1, y + 1, 1, h - 1, '#a89a80');
+    R(c, x + 1, y + 1, w - 2, h - 2, '#d8ccb4');
+    R(c, x + 2, y + 2, w - 4, h - 4, '#e8dec8'); R(c, x + 2, y + 2, w - 4, 1, '#94886f'); R(c, x + 2, y + 2, 1, h - 4, '#94886f');
+    c.clearRect(x + 3, y + 3, w - 6, h - 6);
+  });
+  R(c, 160, 58, 2, 4, '#8a7e62');
+  // latches
+  R(c, 194, 124, 3, 5, '#9a8a62'); R(c, 203, 124, 3, 5, '#9a8a62');
+
+  // drapes
+  function drape(x0, w) {
+    for (let x = x0; x < x0 + w; x++) {
+      const f = Math.sin((x - x0) * 1.15);
+      const col = f > 0.45 ? '#57876e' : f < -0.45 ? '#2a4a3a' : '#3e6a54';
+      R(c, x, 26, 1, 220, col);
+    }
+    R(c, x0, 244, w, 2, '#22382c');
+  }
+  drape(88, 18); drape(294, 18);
+  // tulle
+  function tulle(x0, w) {
+    for (let x = x0; x < x0 + w; x++) {
+      const f = (Math.sin(x * 1.3) + 1) / 2;
+      const bottom = 184 + ((x % 4) < 2 ? 0 : 1);
+      c.fillStyle = `rgba(228,234,244,${0.16 + f * 0.16})`;
+      c.fillRect(x, 26, 1, bottom - 26);
+      if (x % 5 === 0) { c.fillStyle = 'rgba(240,244,250,0.18)'; c.fillRect(x, 26, 1, bottom - 26); }
+    }
+  }
+  tulle(106, 24); tulle(270, 24);
+  // rod
+  R(c, 88, 23, 224, 2, '#b89a5a'); R(c, 88, 23, 224, 1, '#d8bc78');
+  R(c, 85, 22, 4, 4, '#d8b870'); R(c, 311, 22, 4, 4, '#d8b870');
+
+  // sill
+  R(c, 96, 184, 208, 4, '#e6dcc6'); R(c, 96, 184, 208, 1, '#f4ecdc');
+  R(c, 96, 188, 208, 3, '#b8aa90');
+  R(c, 100, 191, 200, 2, '#5a3e32');
+
+  // radiator
+  R(c, 140, 203, 120, 2, '#a89c84'); R(c, 140, 231, 120, 2, '#a89c84');
+  const radCol = ['#eee4ce', '#d8ccb0', '#d8ccb0', '#d8ccb0', '#a89c84'];
+  for (let x = 142; x < 258; x += 7) {
+    // outer columns are 2px shorter at both ends, so each section is rounded top and bottom
+    radCol.forEach((col, k) => { const inset = k === 0 || k === 4 ? 2 : 0; R(c, x + k, 200 + inset, 1, 36 - inset * 2, col); });
+  }
+  R(c, 142, 236, 116, 2, '#5a3e32');
+  R(c, 134, 204, 8, 3, '#b8a88a'); R(c, 134, 207, 3, 37, '#c8bca4'); R(c, 134, 207, 1, 37, '#e0d6c0');
+  R(c, 258, 229, 8, 3, '#b8a88a'); R(c, 263, 193, 3, 51, '#c8bca4'); R(c, 263, 193, 1, 51, '#e0d6c0');
+
+  // ---- sill items ----
+  // geranium
+  for (let y = 174; y < 184; y++) { const w = 12 - Math.floor((y - 174) / 3); R(c, 128 - (w >> 1), y, w, 1, '#b8603a'); }
+  R(c, 121, 173, 14, 2, '#c87048');
+  for (let i = 0; i < 16; i++) ellipse(c, 121 + Math.floor(r() * 14), 160 + Math.floor(r() * 12), 2, 2, ['#3a7a3a', '#2e6a30', '#4a8a44'][i % 3]);
+  [[122, 157], [131, 155], [127, 160], [134, 162]].forEach(([x, y]) => { ellipse(c, x, y, 2, 2, '#d83040'); P(c, x - 1, y - 1, '#ff6a70'); P(c, x + 1, y, '#a82030'); });
+  // tea glass in podstakannik
+  R(c, 162, 170, 7, 10, '#b0602a'); R(c, 162, 170, 7, 2, '#d89050'); R(c, 162, 170, 1, 10, '#e0a870');
+  R(c, 161, 176, 9, 8, '#b89a50'); R(c, 161, 177, 9, 1, '#e0c878'); R(c, 161, 180, 9, 1, '#8a6a30');
+  R(c, 170, 173, 2, 1, '#b89a50'); R(c, 171, 174, 1, 6, '#b89a50'); R(c, 170, 179, 2, 1, '#b89a50');
+  R(c, 167, 165, 1, 6, '#d0d0c8'); // spoon
+  // cactus
+  R(c, 268, 178, 8, 6, '#b8603a'); R(c, 267, 177, 10, 2, '#c87048');
+  R(c, 270, 168, 4, 9, '#3a7a3a'); R(c, 270, 168, 1, 9, '#5a9a54'); R(c, 274, 171, 2, 2, '#3a7a3a'); R(c, 275, 169, 1, 3, '#3a7a3a');
+  P(c, 272, 167, '#ff8aa8');
+
+  // ---- left: cabinet + turntable + lamp ----
+  R(c, 10, 184, 84, 4, '#a8703e'); R(c, 10, 184, 84, 1, '#c88a52');
+  R(c, 12, 188, 80, 56, '#7e4a2a');
+  R(c, 15, 191, 36, 50, '#3a2418');
+  for (let x = 16; x < 50; x++) {
+    if (r() < 0.15) continue;
+    const hh = 34 + Math.floor(r() * 8);
+    R(c, x, 241 - hh, 1, hh, ['#c8b89a', '#2e4a6a', '#a83a2e', '#1a1a1e', '#d8a040', '#3a6a5a', '#5a3a5a'][Math.floor(r() * 7)]);
+  }
+  R(c, 54, 191, 35, 50, '#724226'); R(c, 56, 193, 31, 46, '#6a3c22'); R(c, 57, 194, 29, 44, '#7a4628');
+  R(c, 56, 214, 2, 3, '#d8b060');
+  R(c, 14, 244, 3, 3, '#3a2418'); R(c, 87, 244, 3, 3, '#3a2418');
+  // turntable
+  R(c, 28, 170, 42, 6, '#5a483c'); R(c, 28, 170, 42, 1, '#7a6454');
+  R(c, 28, 176, 42, 8, '#3a2c24'); R(c, 60, 179, 2, 2, '#c8b890'); R(c, 64, 179, 2, 2, '#c8b890');
+  ellipse(c, 43, 173, 12, 2, '#18161a');
+  ellipse(c, 43, 173, 9, 1, '#26232c');
+  R(c, 41, 173, 5, 1, '#c83a3a');
+  R(c, 63, 170, 3, 2, '#c8c8c8'); line(c, 63, 171, 52, 173, '#d8d8d8');
+  // records leaning
+  R(c, 76, 164, 16, 20, '#3a5a8a'); ellipse(c, 84, 172, 4, 4, '#e8d8b0'); R(c, 76, 164, 16, 1, '#5a7aaa');
+  R(c, 71, 167, 16, 17, '#d8a040'); ellipse(c, 79, 175, 3, 3, '#a83a2e'); R(c, 73, 169, 12, 1, '#f0d080');
+  // table lamp base (shade drawn as emissive)
+  R(c, 17, 167, 1, 14, '#b89a60'); R(c, 13, 181, 9, 3, '#8a6a3a'); R(c, 13, 181, 9, 1, '#b08848');
+
+  // ---- right: shelves ----
+  const pal = ['#8a3a2e', '#2e4a6a', '#6a7a3a', '#b8904a', '#5a3a5a', '#3a6a5a', '#c8b89a', '#a85a3a'];
+  function books(x0, x1, base) {
+    let x = x0;
+    while (x < x1) {
+      const w = 2 + Math.floor(r() * 3), h = 9 + Math.floor(r() * 6), col = pal[Math.floor(r() * pal.length)];
+      if (x + w > x1) break;
+      R(c, x, base - h, w, h, col); R(c, x, base - h, 1, h, 'rgba(255,255,255,0.12)');
+      if (r() < 0.5) R(c, x, base - h + 2, w, 1, '#e0c878');
+      x += w + (r() < 0.12 ? 1 : 0);
+    }
+  }
+  [64, 102].forEach(y => {
+    R(c, 312, y, 80, 3, '#9a6a40'); R(c, 312, y, 80, 1, '#b8844e'); R(c, 314, y + 3, 76, 1, '#4a3228');
+    R(c, 318, y + 3, 1, 4, '#7a5030'); R(c, 385, y + 3, 1, 4, '#7a5030');
+  });
+  books(314, 360, 64);
+  matryoshka(c, 367, 64, 13); matryoshka(c, 376, 64, 10); matryoshka(c, 383, 64, 7);
+  books(314, 356, 102);
+  // samovar
+  R(c, 368, 99, 11, 3, '#8a6a2a'); R(c, 370, 96, 7, 3, '#b08838');
+  ellipse(c, 373, 90, 5, 5, '#c89a40'); ellipse(c, 372, 89, 3, 3, '#dcb050'); P(c, 370, 87, '#fbe8a0'); P(c, 370, 88, '#fbe8a0');
+  R(c, 378, 93, 3, 1, '#b08838'); P(c, 381, 94, '#b08838');
+  P(c, 367, 88, '#8a6a2a'); P(c, 379, 88, '#8a6a2a');
+  R(c, 370, 84, 7, 1, '#b08838'); R(c, 372, 82, 3, 2, '#b08838');
+  ellipse(c, 373, 79, 3, 2, '#e8e0d0'); P(c, 372, 79, '#3a5ab0'); P(c, 374, 80, '#3a5ab0'); P(c, 373, 77, '#e8e0d0');
+  // plant on lower shelf
+  R(c, 383, 95, 6, 7, '#b8603a');
+  [[384, 92], [387, 90], [382, 89], [386, 87]].forEach(([x, y]) => ellipse(c, x, y, 2, 1, '#3a7a3a'));
+
+  // birch painting
+  R(c, 316, 116, 30, 30, '#a8803e'); R(c, 316, 116, 30, 1, '#d0a858');
+  ditherV(c, 318, 118, 26, 20, ['#1e2a4a', '#2a3a5c', '#3e4e70']);
+  R(c, 318, 138, 26, 6, '#c8d0e0');
+  [[322, 118], [329, 121], [338, 119]].forEach(([x, y]) => {
+    R(c, x, y, 2, 21, '#ecece4');
+    for (let yy = y + 2; yy < 139; yy += 4) P(c, x + (yy % 3 ? 0 : 1), yy, '#2a2a2a');
+    line(c, x + 1, y + 6, x + 5, y + 2, '#b8b8b0'); line(c, x, y + 10, x - 3, y + 6, '#b8b8b0');
+  });
+
+  // clock face (hands are dynamic)
+  ellipse(c, 372, 128, 9, 9, '#4a3222'); ellipse(c, 372, 128, 8, 8, '#e8e0c8');
+  [[372, 121], [379, 128], [372, 135], [365, 128]].forEach(([x, y]) => P(c, x, y, '#3a2a20'));
+
+  // guitar, leaning against the wall
+  guitar(c, 330, 245, 0.08);
+
+  // left corner: tall plant
+  R(c, -34, 228, 22, 18, '#9a4e30'); R(c, -36, 226, 26, 3, '#b86040'); R(c, -34, 229, 3, 17, '#c07050');
+  R(c, -23, 150, 1, 76, '#4a3a20');
+  line(c, -23, 196, -34, 178, '#4a3a20'); line(c, -23, 184, -12, 164, '#4a3a20'); line(c, -23, 170, -31, 152, '#4a3a20');
+  for (let i = 0; i < 42; i++) {
+    const t = r();
+    const x = -23 + (r() - 0.5) * 30 * (0.5 + t), y = 148 + t * 72;
+    ellipse(c, Math.round(x), Math.round(y), 3, 1, ['#2e6a30', '#3a7a3a', '#1f5a26', '#4a8a44'][i % 4]);
+    P(c, Math.round(x) - 1, Math.round(y), '#5a9a54');
+  }
+
+  // right corner: stool with a transistor radio
+  R(c, 404, 220, 30, 3, '#9a6a40'); R(c, 404, 220, 30, 1, '#b8844e');
+  R(c, 406, 223, 2, 23, '#7a5030'); R(c, 430, 223, 2, 23, '#7a5030'); R(c, 408, 236, 22, 1, '#6a4428');
+  R(c, 408, 206, 24, 14, '#3a3a3e'); R(c, 408, 206, 24, 1, '#5a5a60');
+  for (let y = 209; y < 218; y += 2) for (let x = 410; x < 420; x += 2) P(c, x, y, '#1e1e22');
+  R(c, 422, 209, 8, 4, '#d8c890'); P(c, 425, 210, '#c83a2a'); P(c, 425, 211, '#c83a2a');
+  ellipse(c, 426, 216, 1, 1, '#b8b8b8');
+  line(c, 430, 206, 438, 184, '#b8b8b8');
+  R(c, 412, 202, 16, 4, '#2a2a2e'); R(c, 411, 202, 1, 4, '#2a2a2e'); R(c, 428, 202, 1, 4, '#2a2a2e');
+
+  // floor lamp stand (shade is emissive)
+  R(c, 368, 172, 2, 74, '#b89a60'); R(c, 368, 172, 1, 74, '#dcc088');
+  ellipse(c, 369, 246, 9, 2, '#6a5030'); R(c, 361, 245, 17, 1, '#8a6a40');
+
+  // fikus
+  R(c, 108, 232, 16, 14, '#b8603a'); R(c, 106, 230, 20, 3, '#c87048'); R(c, 108, 232, 2, 14, '#d08058');
+  R(c, 115, 200, 1, 30, '#4a3a20');
+  line(c, 115, 214, 107, 204, '#4a3a20'); line(c, 115, 208, 123, 198, '#4a3a20');
+  for (let i = 0; i < 26; i++) {
+    const a = r() * 6.28, d = r() * 14;
+    const x = 115 + Math.cos(a) * d, y = 204 + Math.sin(a) * d * 0.8;
+    ellipse(c, Math.round(x), Math.round(y), 2, 1, ['#2e6a30', '#3a7a3a', '#1f5a26', '#4a8a44'][i % 4]);
+  }
+
+  // garland wire across the full width (bulbs are emissive)
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  const anchors = [-10, 60, 130, 200, 270, 340, 410, 490];
+  for (let a = 0; a < anchors.length - 1; a++) {
+    const x0 = anchors[a], x1 = anchors[a + 1];
+    for (let x = x0; x < x1; x++) {
+      const t = (x - x0) / (x1 - x0), y = Math.round(18 + 9 * 4 * t * (1 - t));
+      P(c, x, y, '#2a221a');
+      if ((x - x0) % 7 === 3) garland.push({ x, y: y + 1, p: r() * 6.28, s: 0.8 + r() * 1.6, col: ['#ffd27a', '#ffb35c', '#ffe9a8', '#ff9a6a', '#ffd27a'][Math.floor(r() * 5)] });
+    }
+  }
+}
+
+// =====================================================================
+// LIGHTMAP (static, dithered)
+// =====================================================================
+const lightC = mk();
+function buildLight() {
+  const c = lightC.getContext('2d'), img = c.createImageData(W, H), d = img.data;
+  const L = [
+    { x: 369, y: 158, r: 210, c: [255, 170, 90], i: 1.2 },
+    { x: 369, y: 135, r: 55, c: [255, 190, 120], i: 0.5 },
+    { x: 369, y: 205, r: 80, c: [255, 180, 100], i: 0.45 },
+    { x: 18, y: 172, r: 110, c: [255, 190, 110], i: 0.9 },
+    { x: 200, y: 110, r: 180, c: [100, 125, 200], i: 0.7 },
+    { x: 200, y: 110, r: 120, c: [225, 215, 215], i: 1.3 },  // city glow on the frame
+    { x: 200, y: 176, r: 95, c: [235, 210, 190], i: 1.3 },   // ...and on the sill
+    { x: 200, y: 188, r: 85, c: [150, 160, 215], i: 0.35 },
+  ];
+  L.forEach(l => l.x += OX);
+  for (let gx = 20; gx < W; gx += 60) L.push({ x: gx, y: 24, r: 55, c: [255, 185, 110], i: 0.25 });
+  const amb = [40, 35, 58], LV = 30;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const k = (y * W + x) * 4;
+    let rr = amb[0], gg = amb[1], bb = amb[2];
+    for (const l of L) {
+      const dd = Math.hypot(x - l.x, y - l.y);
+      if (dd < l.r) { const f = (1 - dd / l.r) ** 2 * l.i; rr += l.c[0] * f; gg += l.c[1] * f; bb += l.c[2] * f; }
+    }
+    const q = v => Math.min(255, Math.floor(v / 255 * LV + bay(x, y)) / LV * 255);
+    d[k] = q(rr); d[k + 1] = q(gg); d[k + 2] = q(bb); d[k + 3] = 255;
+  }
+  c.putImageData(img, 0, 0);
+}
+function applyLight(src, dst) {
+  const c = dst.getContext('2d');
+  c.globalCompositeOperation = 'source-over';
+  c.clearRect(0, 0, W, H);
+  c.drawImage(src, 0, 0);
+  c.globalCompositeOperation = 'multiply';
+  c.drawImage(lightC, 0, 0);
+  c.globalCompositeOperation = 'destination-in';
+  c.drawImage(src, 0, 0);
+  c.globalCompositeOperation = 'source-over';
+}
+
+// vignette
+const vignC = mk();
+function buildVignette() {
+  const c = vignC.getContext('2d');
+  const sy = H / W;
+  c.save(); c.scale(1, sy);
+  const g = c.createRadialGradient(W / 2, 140 / sy, W * 0.36, W / 2, 140 / sy, W * 0.66);
+  g.addColorStop(0, 'rgba(4,2,8,0)');
+  g.addColorStop(1, 'rgba(4,2,8,0.55)');
+  c.fillStyle = g; c.fillRect(0, 0, W, H / sy);
+  c.restore();
+}
+
+// =====================================================================
+// DYNAMIC
+// =====================================================================
+const snow = [];
+{
+  const r = rng(99);
+  for (let i = 0; i < 170; i++) {
+    const layer = r() < 0.5 ? 0 : r() < 0.75 ? 1 : 2;
+    snow.push({ x: r() * GW, y: r() * GH, l: layer, v: [5, 10, 17][layer] + r() * 4, a: 2 + r() * 4, p: r() * 6.28, f: 0.5 + r() });
+  }
+}
+const smoke = [];
+let smokeT = 0, winT = 0, T = 0, cafeOff = 0, earT = 0, tailT = 0;
+let musicPlaying = false, recA = 0;   // the record spins only while music plays
+
+function update(dt) {
+  T += dt;
+  for (const s of snow) {
+    s.y += s.v * dt;
+    s.x += Math.sin(T * s.f + s.p) * s.a * dt + 2 * dt;
+    if (s.y > GH) { s.y = -2; s.x = Math.random() * GW; }
+    if (s.x > GW) s.x -= GW;
+  }
+  smokeT -= dt;
+  if (smokeT < 0) {
+    smokeT = 0.35;
+    const [cx, cy] = chimneys[Math.floor(Math.random() * chimneys.length)];
+    smoke.push({ x: cx + Math.random() * 2, y: cy, age: 0, life: 4 + Math.random() * 2 });
+  }
+  for (const s of smoke) { s.age += dt; s.y -= 3.2 * dt; s.x += 2.2 * dt + Math.sin(s.age * 1.5) * 0.05; }
+  while (smoke.length && smoke[0].age > smoke[0].life) smoke.shift();
+  winT -= dt;
+  if (winT < 0) {
+    winT = 0.6 + Math.random() * 1.6;
+    const w = cityWin[Math.floor(Math.random() * cityWin.length)];
+    w.lit = !w.lit;
+  }
+  if (cafeOff > 0) cafeOff -= dt; else if (Math.random() < dt * 0.25) cafeOff = 0.08 + Math.random() * 0.25;
+  if (earT > 0) earT -= dt; else if (Math.random() < dt * 0.15) earT = 0.25;
+  if (tailT > 0) tailT -= dt; else if (Math.random() < dt * 0.2) tailT = 0.3;
+  if (musicPlaying) recA += dt * 3.5;
+}
+
+function drawCityDyn(c) {
+  // twinkling stars
+  for (const s of stars) { const v = Math.sin(T * s.s + s.p); if (v > 0.6) P(c, s.x, s.y, '#ffffff'); else if (v < -0.5) P(c, s.x, s.y, '#1a2050'); }
+  // smoke (behind near buildings is fine, chimneys are on top)
+  for (const s of smoke) {
+    const a = (1 - s.age / s.life) * 0.35;
+    c.fillStyle = `rgba(110,110,140,${a})`;
+    const sz = s.age > 2 ? 3 : 2;
+    c.fillRect(Math.round(s.x), Math.round(s.y), sz, sz);
+  }
+  // windows
+  for (const w of cityWin) {
+    if (!w.lit) continue;
+    if (w.col === 'tv') {
+      const f = 0.55 + 0.45 * Math.sin(T * 9 + w.x) * Math.sin(T * 3.3 + w.y);
+      c.fillStyle = `rgb(${90 + f * 60 | 0},${120 + f * 70 | 0},${200 + f * 55 | 0})`;
+    } else c.fillStyle = w.col;
+    c.fillRect(w.x, w.y, 3, 4);
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(w.x + 1, w.y, 1, 4);
+  }
+  // aviation lights
+  for (const b of blinkers) {
+    const on = ((T + b.p) % 1.6) < 0.5;
+    if (on) { P(c, b.x, b.y, '#ff4a3a'); glow(c, b.x + 0.5, b.y + 0.5, 4, '255,60,50', 0.5); }
+  }
+  // Kremlin star
+  c.globalCompositeOperation = 'lighter';
+  const pulse = 0.75 + 0.25 * Math.sin(T * 1.8);
+  glow(c, 96.5, 22.5, 11, '255,40,40', 0.45 * pulse);
+  glow(c, 60.5, 14.5, 5, '255,200,90', 0.3);
+  glow(c, 23.5, 81.5, 9, '255,40,40', 0.5);
+  if (cafeOff <= 0) glow(c, 64.5, 118.5, 14, '255,80,140', 0.35);
+  c.globalCompositeOperation = 'source-over';
+  const star = ['..#..', '#####', '.###.', '.#.#.'];
+  star.forEach((row, j) => [...row].forEach((v, i) => { if (v === '#') P(c, 94 + i, 20 + j, j === 1 && i === 2 ? '#ffd0d0' : '#ff3434'); }));
+  // metro sign
+  const M = ['#...#', '##.##', '#.#.#', '#...#', '#...#'];
+  M.forEach((row, j) => [...row].forEach((v, i) => { if (v === '#') P(c, 21 + i, 79 + j, '#ff3a3a'); }));
+  // cafe neon
+  text(c, 'КАФЕ', 57, 116, cafeOff > 0 ? '#4a2030' : '#ff6c9a');
+  // snow
+  for (const s of snow) {
+    const x = Math.round(s.x), y = Math.round(s.y);
+    if (s.l === 0) P(c, x, y, '#7c88b4');
+    else if (s.l === 1) P(c, x, y, '#dfe6f6');
+    else { c.fillStyle = '#eef3fc'; c.fillRect(x, y, 2, 2); }
+  }
+}
+
+const dynC = mk(), dynLit = mk();
+function mskNow() {
+  const s = new Date().toLocaleTimeString('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const [h, m, sec] = s.split(':').map(Number);
+  return { h, m, s: sec, str: s.slice(0, 5) };
+}
+
+function drawCat(c) {
+  const breath = Math.sin(T * 2.1) > 0.2 ? 1 : 0;
+  const out = '#3a1c0e', fur = '#e8903e', dk = '#9a5424', lt = '#f8d49a';
+  // contact shadow on the sill so the cat sits on it rather than hovers
+  c.fillStyle = 'rgba(30,12,6,0.5)'; c.fillRect(211, 184, 42, 1);
+  c.fillStyle = 'rgba(30,12,6,0.25)'; c.fillRect(213, 185, 38, 1);
+  // tail: comes out from behind the body, lies on the sill, tip curls up and sways
+  const sway = Math.round(Math.sin(T * 0.9) * 1.2 + (tailT > 0 ? 1 : 0));
+  const tail = [[244, 182], [246, 182], [248, 182], [250, 182], [252, 182], [254, 181], [256, 180],
+                [257 + sway, 178], [257 + sway, 176], [256 + sway, 174]];
+  tail.forEach(([x, y]) => R(c, x - 1, y - 1, 4, 4, out));
+  tail.forEach(([x, y], i) => R(c, x, y, 2, 2, i >= tail.length - 2 ? dk : i % 2 ? dk : fur));
+  // body
+  ellipse(c, 234, 178, 14, 7 + breath, out, 183);
+  ellipse(c, 234, 178, 13, 6 + breath, fur, 183);
+  for (let x = 226; x < 247; x += 4) for (let y = 172 - breath; y < 180; y++) {
+    const dy = (y - 178) / (6 + breath), dx = (x - 234) / 13;
+    if (dx * dx + dy * dy < 0.85) P(c, x, y, dk);
+  }
+  R(c, 224, 181, 20, 2, lt);
+  R(c, 221, 183, 27, 1, out);                  // body rests flat on the sill
+  // head (resting on paws, a bit raised)
+  const hx = 220, hy = 176;
+  // ears first so the head outline sits over their base
+  const ey = earT > 0 ? 1 : 0;
+  [[hx - 3, 0], [hx + 3, ey]].forEach(([ex, o]) => {
+    P(c, ex, hy - 7 + o, out);
+    R(c, ex - 1, hy - 6 + o, 3, 1, out); P(c, ex, hy - 6 + o, fur);
+    R(c, ex - 2, hy - 5 + o, 5, 1, out); R(c, ex - 1, hy - 5 + o, 3, 1, fur); P(c, ex, hy - 5 + o, '#f0a0a0');
+  });
+  ellipse(c, hx, hy, 6, 5, out, 183);
+  ellipse(c, hx, hy, 5, 4, fur, 183);
+  P(c, hx - 1, hy - 3, dk); P(c, hx + 1, hy - 3, dk); P(c, hx, hy - 4, dk);
+  R(c, hx - 4, hy + 1, 4, 2, lt); R(c, hx + 1, hy + 1, 3, 2, lt);
+  P(c, hx - 1, hy + 1, '#e07a7a');
+  // closed eyes ‿
+  P(c, hx - 4, hy - 1, out); P(c, hx - 3, hy, out); P(c, hx - 2, hy - 1, out);
+  P(c, hx + 1, hy - 1, out); P(c, hx + 2, hy, out); P(c, hx + 3, hy - 1, out);
+  // front paws stretched forward under the chin, with toe lines
+  [hx - 9, hx - 4].forEach(px => {
+    R(c, px - 1, 180, 7, 4, out);
+    R(c, px, 181, 5, 2, lt);
+    P(c, px + 1, 181, '#c88a58'); P(c, px + 3, 181, '#c88a58');
+  });
+}
+
+function drawRoomDyn(c) {
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, W, H);
+  c.translate(OX, 0);
+  drawCat(c);
+  // clock hands
+  const t = mskNow();
+  const ma = (t.m + t.s / 60) / 60 * Math.PI * 2 - Math.PI / 2, ha = ((t.h % 12) + t.m / 60) / 12 * Math.PI * 2 - Math.PI / 2;
+  line(c, 372, 128, 372 + Math.round(Math.cos(ma) * 6), 128 + Math.round(Math.sin(ma) * 6), '#2a1a12');
+  line(c, 372, 128, 372 + Math.round(Math.cos(ha) * 4), 128 + Math.round(Math.sin(ha) * 4), '#2a1a12');
+  P(c, 372, 128, '#a83a2e');
+  // spinning record highlight
+  const a = recA;
+  P(c, 43 + Math.round(Math.cos(a) * 8), 173 + Math.round(Math.sin(a) * 1.4), '#6a6878');
+  P(c, 43 + Math.round(Math.cos(a + 3.14) * 6), 173 + Math.round(Math.sin(a + 3.14) * 1), '#4a4858');
+}
+
+function drawEmissive(c) {
+  const flick = 0.92 + 0.05 * Math.sin(T * 13) * Math.sin(T * 7.3) + 0.03 * Math.sin(T * 1.1);
+  c.save();
+  c.translate(OX, 0);
+  // tea steam
+  for (let i = 0; i < 7; i++) {
+    const ph = (T * 0.45 + i / 7) % 1;
+    const y = 168 - ph * 22, x = 165 + Math.sin(ph * 7 + i) * 2.2 + ph * 2;
+    c.fillStyle = `rgba(230,230,240,${(1 - ph) * 0.35})`;
+    c.fillRect(Math.round(x), Math.round(y), 1, 1);
+  }
+  // floor lamp shade
+  for (let y = 148; y < 171; y++) {
+    const w = 16 + Math.round((y - 148) / 22 * 12);
+    for (let k = 0; k < w; k++) {
+      const x = 369 - (w >> 1) + k;
+      let col = (k % 3 === 0) ? '#e49a48' : '#f4b462';
+      if (y === 148) col = '#c87a38';
+      if (y > 166) col = '#ffd890';
+      if (y === 170) col = '#c06a30';
+      P(c, x, y, col);
+    }
+  }
+  for (let x = 356; x < 383; x += 2) P(c, x, 171, '#d88a40');
+  // table lamp shade (green glass)
+  ellipse(c, 17, 166, 7, 5, '#2e7a4e', 166);
+  ellipse(c, 16, 164, 3, 2, '#5ab07a', 164);
+  R(c, 10, 166, 15, 1, '#ffe0a0');
+  // glows
+  c.globalCompositeOperation = 'lighter';
+  glow(c, 369, 160, 70, '255,160,80', 0.16 * flick);
+  glow(c, 369, 172, 22, '255,210,140', 0.25 * flick);
+  glow(c, 17, 168, 34, '255,200,120', 0.18);
+  c.restore();
+  // garland lives in full-width scene coords
+  c.globalCompositeOperation = 'lighter';
+  for (const b of garland) {
+    const v = 0.6 + 0.4 * Math.sin(T * b.s + b.p);
+    glow(c, b.x + 0.5, b.y + 0.5, 6, '255,190,110', 0.22 * v);
+  }
+  c.globalCompositeOperation = 'source-over';
+  for (const b of garland) {
+    const v = 0.6 + 0.4 * Math.sin(T * b.s + b.p);
+    c.globalAlpha = 0.55 + 0.45 * v;
+    P(c, b.x, b.y, b.col); P(c, b.x, b.y + 1, b.col);
+  }
+  c.globalAlpha = 1;
+}
+
+// =====================================================================
+// boot
+// =====================================================================
+drawCity(); drawGlass(); drawRoom(); buildLight(); buildVignette();
+const roomLit = mk(); applyLight(roomC, roomLit);
+
+function frame(now) {
+  const dt = Math.min(0.1, (now - (frame.last || now)) / 1000); frame.last = now;
+  update(dt);
+  ctx.clearRect(0, 0, W, H);
+  ctx.drawImage(cityC, GX + OX, GY);
+  ctx.save(); ctx.beginPath(); ctx.rect(GX + OX, GY, GW, GH); ctx.clip(); ctx.translate(GX + OX, GY);
+  drawCityDyn(ctx);
+  ctx.restore();
+  ctx.drawImage(glassC, 0, 0);
+  ctx.drawImage(roomLit, 0, 0);
+  drawRoomDyn(dynC.getContext('2d')); applyLight(dynC, dynLit); ctx.drawImage(dynLit, 0, 0);
+  drawEmissive(ctx);
+  ctx.drawImage(vignC, 0, 0);
+  if (!frame.bg) { frame.bg = true; extendBackdrop(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// cover the screen; crop mostly the floor, never the 400px core or above the baseboard
+// (portrait phones may crop down to the window and the nearest furniture)
+const MIN_H = 256;
+function fit() {
+  const vw = innerWidth, vh = innerHeight;
+  // portrait phones: zoom in until just the window with its frame fills the width;
+  // the side walls go off-screen, the HUD and player sit on the ceiling / floor bands
+  const MIN_W = vw < vh ? 184 : 400;
+  const k = Math.min(Math.max(vw / W, vh / H), vw / MIN_W, vh / MIN_H);
+  const cw = W * k, ch = H * k, excess = ch - vh;
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  cv.style.left = (vw - cw) / 2 + 'px';
+  cv.style.top = (excess > 0 ? -excess * 0.15 : -excess / 2) + 'px';
+}
+addEventListener('resize', fit); fit();
+
+// Continue the ceiling and floor past the canvas edges (visible on tall screens),
+// using the average colour of the canvas' top and bottom rows.
+function extendBackdrop() {
+  const avg = y => {
+    const d = ctx.getImageData(0, y, W, 1).data; let r = 0, g = 0, b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+    const n = d.length / 4; return `rgb(${r / n | 0},${g / n | 0},${b / n | 0})`;
+  };
+  document.getElementById('stage').style.background = `linear-gradient(${avg(0)} 0 50%, ${avg(H - 1)} 50% 100%)`;
+}
+
+// clock in HUD
+const tEl = document.getElementById('t');
+setInterval(() => tEl.textContent = mskNow().str, 1000); tEl.textContent = mskNow().str;
+
+// =====================================================================
+// PLAYER
+// =====================================================================
+const TRACKS = [
+  { src: 'music/01.mp3', title: 'Трек 1' },
+  { src: 'music/02.mp3', title: 'Трек 2' },
+];
+const XF = 4;                                   // crossfade, seconds
+const $ = id => document.getElementById(id);
+const decks = [new Audio(), new Audio()].map(a => { a.preload = 'auto'; return { a, g: 0 }; });
+let deck = 0, ti = 0, fade = null;
+let musicVol = 0.8, ambVol = 0.45;
+
+function loadDeck(d, i) { decks[d].a.src = TRACKS[i].src; decks[d].a.currentTime = 0; }
+loadDeck(0, 0);
+
+// ambience: slow wind (brown noise) + vinyl crackle, generated with WebAudio
+let actx = null, ambGain = null;
+function initAmbience() {
+  actx = new (window.AudioContext || window.webkitAudioContext)();
+  const sr = actx.sampleRate, len = sr * 6;
+  const brown = actx.createBuffer(1, len, sr), bd = brown.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < len; i++) { last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02; bd[i] = last * 3.5; }
+  const crackle = actx.createBuffer(1, len, sr), cd = crackle.getChannelData(0);
+  for (let i = 0; i < len; i++) if (Math.random() < 0.00045) {
+    const amp = (0.25 + Math.random() * 0.75) * (Math.random() < 0.5 ? -1 : 1);
+    for (let k = 0; k < 24 && i + k < len; k++) cd[i + k] += amp * Math.exp(-k / 4);
+  }
+  ambGain = actx.createGain(); ambGain.gain.value = ambVol * 0.5; ambGain.connect(actx.destination);
+
+  const wind = actx.createBufferSource(); wind.buffer = brown; wind.loop = true;
+  const lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+  const windGain = actx.createGain(); windGain.gain.value = 0.55;
+  const lfo = actx.createOscillator(); lfo.frequency.value = 0.07;
+  const lfoDepth = actx.createGain(); lfoDepth.gain.value = 0.3;
+  lfo.connect(lfoDepth).connect(windGain.gain);
+  wind.connect(lp).connect(windGain).connect(ambGain);
+
+  const cr = actx.createBufferSource(); cr.buffer = crackle; cr.loop = true;
+  const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 1200;
+  const crGain = actx.createGain(); crGain.gain.value = 0.35;
+  cr.connect(hp).connect(crGain).connect(ambGain);
+
+  wind.start(); cr.start(); lfo.start();
+}
+
+function setPlaying(on) {
+  musicPlaying = on;
+  $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on);
+  $('play').setAttribute('aria-label', on ? 'Пауза' : 'Play');
+  if (on) {
+    if (!actx) initAmbience(); else actx.resume();
+    if (fade) decks[fade.to].a.play();
+    if (decks[deck].g === 0 && !fade) decks[deck].g = 1;
+    decks[deck].a.play();
+  } else {
+    decks.forEach(d => d.a.pause());
+    if (actx) actx.suspend();
+  }
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = on ? 'playing' : 'paused';
+}
+
+function startFade(dur) {
+  if (fade) finishFade();
+  const to = 1 - deck;
+  ti = (ti + 1) % TRACKS.length;
+  loadDeck(to, ti);
+  decks[to].g = 0;
+  if (musicPlaying) decks[to].a.play();
+  fade = { to, t0: performance.now(), dur: dur * 1000 };
+  updateMeta();
+}
+function finishFade() {
+  decks[deck].a.pause(); decks[deck].g = 0;
+  deck = fade.to; decks[deck].g = 1; fade = null;
+}
+
+const fmt = s => isFinite(s) ? `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}` : '-:--';
+function updateMeta() {
+  $('p-title').textContent = TRACKS[ti].title;
+  if ('mediaSession' in navigator) navigator.mediaSession.metadata = new MediaMetadata({ title: TRACKS[ti].title, artist: 'Lofi Russia' });
+}
+
+function playerTick(now) {
+  if (fade) {
+    const k = Math.min(1, (now - fade.t0) / fade.dur);
+    decks[deck].g = 1 - k; decks[fade.to].g = k;
+    if (k >= 1) finishFade();
+  } else if (musicPlaying) {
+    const a = decks[deck].a;
+    if (a.duration && a.duration - a.currentTime < XF) startFade(XF);
+  }
+  decks.forEach(d => d.a.volume = Math.max(0, Math.min(1, d.g * musicVol)));
+  if (musicPlaying || fade) {
+    const a = decks[fade ? fade.to : deck].a;
+    $('p-sub').textContent = `${fmt(a.currentTime)} / ${fmt(a.duration)}`;
+    $('p-bar').style.width = (a.duration ? a.currentTime / a.duration * 100 : 0) + '%';
+  }
+  requestAnimationFrame(playerTick);
+}
+requestAnimationFrame(playerTick);
+
+function togglePlay() {
+  if (!musicPlaying && $('p-title').textContent === 'Нажми play') updateMeta();
+  setPlaying(!musicPlaying);
+}
+function nextTrack() { startFade(musicPlaying ? 1.2 : 0.01); }
+
+$('play').onclick = togglePlay;
+$('next').onclick = nextTrack;
+$('fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen?.();
+
+function bindVol(id, set) {
+  const el = $(id);
+  const apply = () => { el.style.setProperty('--v', el.value + '%'); set(el.value / 100); };
+  el.addEventListener('input', apply); apply();
+}
+bindVol('v-music', v => musicVol = v);
+bindVol('v-amb', v => { ambVol = v; if (ambGain) ambGain.gain.value = v * 0.5; });
+
+if ('mediaSession' in navigator) {
+  navigator.mediaSession.setActionHandler('play', () => setPlaying(true));
+  navigator.mediaSession.setActionHandler('pause', () => setPlaying(false));
+  navigator.mediaSession.setActionHandler('nexttrack', nextTrack);
+}
+
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' && e.key !== ' ') return;
+  const k = e.key.toLowerCase();
+  if (k === 'h' || k === 'р') { $('hud').classList.toggle('off'); $('player').classList.toggle('off'); }
+  else if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  else if (k === 'n' || k === 'т') nextTrack();
+  else if (k === 'f' || k === 'а') $('fs').click();
+});
+</script>
+</body>
+</html>
